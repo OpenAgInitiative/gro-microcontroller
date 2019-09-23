@@ -50,12 +50,7 @@ void Communication::send(String outgoing_message) {
 }
 
 bool Communication::available(void) {
-  if (Serial.available()) {
-    return 1;
-  }
-  else {
-    return 0;
-  }
+  return Serial.available() ? 1 : 0;
 }
 
 String Communication::receive(void) { 
@@ -69,10 +64,8 @@ String Communication::receive(void) {
     delay(10);
     incoming_char = Serial.read();
 
-    if (not_connected_ && (incoming_char == '\n')) {
-      break;
-    }
-    if (!not_connected_ && (incoming_char == kEndOfTransmissionChar)) {
+    if ((not_connected_ && (incoming_char == '\n'))
+    		|| (!not_connected_ && (incoming_char == kEndOfTransmissionChar)))  {
       break;
     }
     
@@ -84,15 +77,13 @@ String Communication::receive(void) {
     }
   }
   if (not_connected_) {
-    if (timed_out) {
+    if (timed_out)
       incoming_message = "Timed Out";
-    }
     return incoming_message;
   }
   else {
-    if (timed_out) {
+    if (timed_out)
       return "";
-    } 
     String unpacked_message =  getUnpackedMessage(incoming_message);
     return unpacked_message;
   }
@@ -131,79 +122,40 @@ String Communication::getChecksum(String message) {
 }
 
 String Communication::getUnpackedMessage(String message) {
-  // Check Start of Header
-  if (!checkStartOfHeader(message)) {
-    return "";
-  }
-  
   // Parse Header
   int message_size = parseHeader(message);
-  if (message_size < 0) {
-    return "";
-  }
 
   // Parse Text
   String unpacked_message = parseText(message); 
-  if (unpacked_message == "") {
-    return "";
-  }
-
-  // Check Message Size
-  if (message_size != unpacked_message.length()) {
-    return "";
-  }
   
   // Compute & Compare Checksums
   String incoming_checksum = parseFooter(message);
   String computed_checksum = getChecksum(unpacked_message);
-  if (incoming_checksum != computed_checksum) {
-    return "";
-  }
   
-  // Received Valid Message
-  return unpacked_message;
+  return (!checkStartOfHeader(message)
+		  || message_size < 0 
+		  || unpacked_message == "" // 
+		  || message_size != unpacked_message.length()
+		  || incoming_checksum != computed_checksum ) ? "" : unpacked_message;
 }
 
 bool Communication::checkStartOfHeader(String message) {
-  if (message[0] == kStartOfHeaderChar) {
-    return 1;
-  }
-  else {
-    return 0;
-  }
+  return (message[0] == kStartOfHeaderChar) ? 1 : 0;
 }
 
 int Communication::parseHeader(String message) {
   int end_char = message.indexOf(kStartOfTextChar);
-  if (end_char < 0) {
-    return -1;
-  }
-  return message.substring(1,end_char).toInt();
+  return (end_char < 0) ? -1 : message.substring(1,end_char).toInt();
 }
 
 String Communication::parseText(String message) {
   int start_char = message.indexOf(kStartOfTextChar) +1 ;
   int end_char = message.indexOf(kEndOfTextChar);
-  if (end_char < 0) {
-    return "";
-  }
-  if (end_char <= start_char) {
-    return "";
-  }
-  return message.substring(start_char,end_char);
+  return (end_char < 0 || end_char <= start_char) ? "" : message.substring(start_char,end_char);
 }
 
 String Communication::parseFooter(String message) {
   int start_char = message.indexOf(kEndOfTextChar) + 1;
   int end_char = message.length();
-  if (end_char < 0) {
-    return "";
-  }
-  if (end_char <= start_char) {
-    return "";
-  }
-  return message.substring(start_char,end_char);
+  return (end_char < 0 || end_char <= start_char) ? "" : message.substring(start_char,end_char);
 }
-
-
-
